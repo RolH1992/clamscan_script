@@ -1,0 +1,30 @@
+# ClamAV System Scan Script
+
+A bash script wrapper for ClamAV that performs comprehensive system scans with proper service management and logging.
+
+## ⚠️ Disclaimer
+
+This is **NOT** an official ClamAV product. This is a helper script I created to simplify ClamAV system scans.
+
+**ClamAV** is an open source antivirus engine maintained by Cisco Systems, Inc.
+- Official Website: https://www.clamav.net/
+- License: GPLv2
+- Copyright: Cisco Systems, Inc. and contributors
+
+Acknowledgments
+- Thanks to the ClamAV team and Cisco for maintaining this excellent open source antivirus
+- ClamAV GitHub: https://github.com/Cisco-Talos/clamav
+
+## Features
+
+- Automated virus definition updates
+- Proper service management during scans
+- Comprehensive logging and reporting
+- Exclusion of system directories to avoid errors
+- Color-coded output for easy reading
+- Automatic infected file removal
+
+## Usage
+
+```bash
+sudo ./full-system-scan.sh
