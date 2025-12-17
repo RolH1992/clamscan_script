@@ -7,23 +7,47 @@
 
 # Save as: full-system-scan.sh
 
-# Colors for output
+# Colors for output/ change if you like 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Log file
+# Log file to check previous scans
 LOG_FILE="/var/log/clamav-full-scan-$(date +%Y%m%d-%H%M%S).log"
 SCAN_REPORT="/var/log/clamav-scan-report-$(date +%Y%m%d-%H%M%S).txt"
 
-# Check if running as root
+# The progression bar
+progress_bar() {
+    local current=$1  
+    local len=$2
+    
+    local bar_char='|'
+    local empty_char=' '
+    local length=50
+    local perc_done=$((current * 100 / len))
+    local num_bars=$((perc_done * length / 100))
+   
+    local i 
+    local s='['
+    for ((i = 0; i < num_bars; i++)); do
+        s+=$bar_char
+    done 
+    for ((i = num_bars; i < length; i++)); do
+        s+=$empty_char
+    done
+    s+=']'
+    
+    echo -ne "$s $current/$len ($perc_done%)\r"
+}
+
+# Check if running as root /please review code if you unsure of running root privelidges
 if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}Error: This script must be run as root (use sudo)${NC}"
     exit 1
 fi
 
-# Function to log messages
+# Function to log messages 
 log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
 }
@@ -84,28 +108,90 @@ fi
 # Step 5: Define excluded directories (to avoid unnecessary scanning and errors)
 EXCLUDE_DIRS="--exclude-dir=/proc --exclude-dir=/sys --exclude-dir=/dev --exclude-dir=/snap --exclude-dir=/run --exclude-dir=/tmp"
 
-# Step 6: Start the full system scan
+# Step 6: Start the full system scan with progress bar this can be removed 
 log_message "Starting full system scan..."
 echo -e "${YELLOW}This may take several hours depending on your system size...${NC}"
 echo -e "${YELLOW}Do not interrupt the scan!${NC}"
 
-# Run the scan with detailed options
-clamscan --verbose \
-    --recursive \
-    --infected \
-    --remove \
-    --detect-pua \
-    --scan-archive=yes \
-    --max-filesize=512M \
-    --max-scansize=512M \
-    $EXCLUDE_DIRS \
-    / \
-    > "$SCAN_REPORT" 2>&1
+echo ""
+echo -e "${GREEN}Scan Progress:${NC}"
+
+# Initialize variables for progress tracking
+FILE_COUNT=0
+SCANNED_COUNT=0
+
+# Count total files first (this gives us the total for progress bar) this can be removed.
+echo "Counting files on system (for progress bar)..."
+FILE_COUNT=$(find / -type f \
+    ! -path "/proc/*" \
+    ! -path "/sys/*" \
+    ! -path "/dev/*" \
+    ! -path "/snap/*" \
+    ! -path "/run/*" \
+    ! -path "/tmp/*" \
+    2>/dev/null | wc -l)
+
+if [ "$FILE_COUNT" -eq 0 ]; then
+    echo -e "${YELLOW}Could not count files, running scan without progress bar${NC}"
+    # Run the scan with detailed options
+    clamscan --verbose \
+        --recursive \
+        --infected \
+        --remove \
+        --detect-pua \
+        --scan-archive=yes \
+        --max-filesize=512M \
+        --max-scansize=512M \
+        $EXCLUDE_DIRS \
+        / \
+        > "$SCAN_REPORT" 2>&1
+else
+    echo "Total files to scan: $FILE_COUNT"
+    echo ""
+    
+    # Show initial progress bar
+    progress_bar 0 "$FILE_COUNT"
+    
+    # Run scan and track progress 
+    clamscan --verbose \
+        --recursive \
+        --infected \
+        --remove \
+        --detect-pua \
+        --scan-archive=yes \
+        --max-filesize=512M \
+        --max-scansize=512M \
+        $EXCLUDE_DIRS \
+        / 2>&1 | tee "$SCAN_REPORT" | while IFS= read -r line; do
+        
+        # Update progress bar when a file is scanned
+        if [[ "$line" == Scanning* ]]; then
+            SCANNED_COUNT=$((SCANNED_COUNT + 1))
+            # Update progress bar every 100 files to avoid slowing down
+            if [ $((SCANNED_COUNT % 100)) -eq 0 ] || [ "$SCANNED_COUNT" -eq "$FILE_COUNT" ]; then
+                progress_bar "$SCANNED_COUNT" "$FILE_COUNT"
+            fi
+        fi
+        
+        # Show virus alerts immediately
+        if [[ "$line" == *FOUND ]]; then
+            echo ""  # New line for alert
+            echo -e "${RED}$line${NC}"
+            # Show progress bar again after alert
+            progress_bar "$SCANNED_COUNT" "$FILE_COUNT"
+        fi
+    done
+    
+    # Final progress update
+    progress_bar "$FILE_COUNT" "$FILE_COUNT"
+    echo ""
+fi
 
 # Capture the exit status
-SCAN_EXIT=$?
+SCAN_EXIT=${PIPESTATUS[0]}
 
 # Step 7: Process results
+echo ""
 echo "==========================================" | tee -a "$LOG_FILE"
 log_message "Scan completed with exit code: $SCAN_EXIT"
 
