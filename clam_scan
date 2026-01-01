@@ -17,15 +17,34 @@ NC='\033[0m' # No Color
 LOG_FILE="/var/log/clamav-full-scan-$(date +%Y%m%d-%H%M%S).log"
 SCAN_REPORT="/var/log/clamav-scan-report-$(date +%Y%m%d-%H%M%S).txt"
 
-# The progression bar
+# The progression bar - FIXED FOR CACHY OS
 progress_bar() {
     local current=$1  
     local len=$2
     
+    # FIX: Clean inputs and ensure they're valid numbers
+    current="${current//[^0-9]/}"  # Remove any non-digit characters
+    len="${len//[^0-9]/}"  # Remove any non-digit characters
+    
+    # Set defaults if empty
+    if [[ -z "$current" ]] || [[ ! "$current" =~ ^[0-9]+$ ]]; then
+        current=0
+    fi
+    
+    if [[ -z "$len" ]] || [[ ! "$len" =~ ^[0-9]+$ ]] || [[ "$len" -eq 0 ]]; then
+        len=1  # Prevent division by zero
+    fi
+    
     local bar_char='|'
     local empty_char=' '
     local length=50
+    
+    # Safe arithmetic
     local perc_done=$((current * 100 / len))
+    if [[ "$perc_done" -gt 100 ]]; then
+        perc_done=100
+    fi
+    
     local num_bars=$((perc_done * length / 100))
    
     local i 
@@ -38,7 +57,8 @@ progress_bar() {
     done
     s+=']'
     
-    echo -ne "$s $current/$len ($perc_done%)\r"
+    # Use printf instead of echo -ne for cleaner output
+    printf "\r%s %s/%s (%s%%)" "$s" "$current" "$len" "$perc_done"
 }
 
 # Check if running as root /please review code if you unsure of running root privelidges
@@ -108,7 +128,7 @@ fi
 # Step 5: Define excluded directories (to avoid unnecessary scanning and errors)
 EXCLUDE_DIRS="--exclude-dir=/proc --exclude-dir=/sys --exclude-dir=/dev --exclude-dir=/snap --exclude-dir=/run --exclude-dir=/tmp"
 
-# Step 6: Start the full system scan with progress bar this can be removed 
+# Step 6: Start the full system scan with progress bar
 log_message "Starting full system scan..."
 echo -e "${YELLOW}This may take several hours depending on your system size...${NC}"
 echo -e "${YELLOW}Do not interrupt the scan!${NC}"
@@ -120,7 +140,7 @@ echo -e "${GREEN}Scan Progress:${NC}"
 FILE_COUNT=0
 SCANNED_COUNT=0
 
-# Count total files first (this gives us the total for progress bar) this can be removed.
+# Count total files first (this gives us the total for progress bar)
 echo "Counting files on system (for progress bar)..."
 FILE_COUNT=$(find / -type f \
     ! -path "/proc/*" \
@@ -145,6 +165,7 @@ if [ "$FILE_COUNT" -eq 0 ]; then
         $EXCLUDE_DIRS \
         / \
         > "$SCAN_REPORT" 2>&1
+    SCAN_EXIT=$?
 else
     echo "Total files to scan: $FILE_COUNT"
     echo ""
@@ -152,7 +173,9 @@ else
     # Show initial progress bar
     progress_bar 0 "$FILE_COUNT"
     
-    # Run scan and track progress 
+    # Run scan and track progress - FIXED PIPELINE
+    # Using a subshell to handle the pipeline properly
+    (
     clamscan --verbose \
         --recursive \
         --infected \
@@ -162,33 +185,40 @@ else
         --max-filesize=512M \
         --max-scansize=512M \
         $EXCLUDE_DIRS \
-        / 2>&1 | tee "$SCAN_REPORT" | while IFS= read -r line; do
+        / 2>&1 
+    ) | tee "$SCAN_REPORT" | while IFS= read -r line; do
         
         # Update progress bar when a file is scanned
         if [[ "$line" == Scanning* ]]; then
             SCANNED_COUNT=$((SCANNED_COUNT + 1))
             # Update progress bar every 100 files to avoid slowing down
             if [ $((SCANNED_COUNT % 100)) -eq 0 ] || [ "$SCANNED_COUNT" -eq "$FILE_COUNT" ]; then
-                progress_bar "$SCANNED_COUNT" "$FILE_COUNT"
+                # Pass clean values to progress_bar
+                clean_count="${SCANNED_COUNT//[^0-9]/}"
+                clean_total="${FILE_COUNT//[^0-9]/}"
+                progress_bar "$clean_count" "$clean_total"
             fi
         fi
         
         # Show virus alerts immediately
         if [[ "$line" == *FOUND ]]; then
-            echo ""  # New line for alert
+            printf "\n"  # New line for alert
             echo -e "${RED}$line${NC}"
             # Show progress bar again after alert
-            progress_bar "$SCANNED_COUNT" "$FILE_COUNT"
+            clean_count="${SCANNED_COUNT//[^0-9]/}"
+            clean_total="${FILE_COUNT//[^0-9]/}"
+            progress_bar "$clean_count" "$clean_total"
         fi
     done
     
+    # Capture the exit status - FIXED: Get it from the subshell
+    SCAN_EXIT=${PIPESTATUS[0]}
+    
     # Final progress update
-    progress_bar "$FILE_COUNT" "$FILE_COUNT"
-    echo ""
+    clean_total="${FILE_COUNT//[^0-9]/}"
+    progress_bar "$clean_total" "$clean_total"
+    printf "\n"
 fi
-
-# Capture the exit status
-SCAN_EXIT=${PIPESTATUS[0]}
 
 # Step 7: Process results
 echo ""

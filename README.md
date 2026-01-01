@@ -1,51 +1,62 @@
-ClamAV Complete System Scan Script
-Overview
+# ClamAV Complete System Scan Script
 
 A comprehensive Bash script for performing full system virus scans using ClamAV antivirus. This script automates the entire scanning process with progress tracking, logging, and system safety features.
-Features
-🛡️ Security & Safety
 
- -Root Privilege Check: Ensures script runs with appropriate permissions
- -Service Management: Automatically stops/stops freshclam service to prevent conflicts
- -Directory Exclusion: Skips system directories like /proc, /sys, /dev to avoid issues
- -Error Handling: Comprehensive error checking and graceful failure handling
+> **Disclaimer**: This is a third-party automation script for ClamAV. ClamAV is an open-source antivirus engine owned by Cisco Systems, Inc. This project is not affiliated with, endorsed by, or connected to Cisco Systems or the official ClamAV project.
 
-📊 Progress Tracking
--Real-time Progress Bar: Visual progress indicator showing scan completion percentage
--File Counting: Pre-scans to estimate total files for accurate progress tracking
--Live Updates: Progress updates every 100 files scanned
+## Features
 
-📝 Logging & Reporting
+### 🛡️ Security & Safety
+- **Root Privilege Check**: Ensures script runs with appropriate permissions
+- **Service Management**: Automatically stops/stops freshclam service to prevent conflicts
+- **Directory Exclusion**: Skips system directories like `/proc`, `/sys`, `/dev` to avoid issues
+- **Error Handling**: Comprehensive error checking and graceful failure handling
 
--Timestamped Logs: Automatic log file generation with date/time stamps
--Dual Output: Both console display and file logging
--Scan Reports: Detailed scan results saved separately
--Summary Display: Quick overview of scan results at completion
+### 📊 Progress Tracking
+- **Real-time Progress Bar**: Visual progress indicator showing scan completion percentage
+- **File Counting**: Pre-scans to estimate total files for accurate progress tracking
+- **Live Updates**: Progress updates every 100 files scanned
 
-🔄 Automation Features
+### 📝 Logging & Reporting
+- **Timestamped Logs**: Automatic log file generation with date/time stamps
+- **Dual Output**: Both console display and file logging
+- **Scan Reports**: Detailed scan results saved separately
+- **Summary Display**: Quick overview of scan results at completion
 
--Virus Database Updates: Automatic freshclam execution before scanning
--Database Age Check: Warns if virus definitions are outdated (>7 days)
--Infected File Handling: Automatic detection and removal of viruses
--Exit Code Interpretation: Clear explanations of ClamAV exit codes
+### 🔄 Automation Features
+- **Virus Database Updates**: Automatic freshclam execution before scanning
+- **Database Age Check**: Warns if virus definitions are outdated (>7 days)
+- **Infected File Handling**: Automatic detection and removal of viruses
+- **Exit Code Interpretation**: Clear explanations of ClamAV exit codes
 
-Technical Details
-Scan Configuration
+## Technical Details
 
--Recursive Scanning: Scans all subdirectories
--Archive Scanning: Examines compressed files
--PUA Detection: Potentially Unwanted Applications detection
--File Size Limits: 512MB maximum per file/archive
-- Excluded Directories: /proc, /sys, /dev, /snap, /run, /tmp
+### Scan Configuration
+- **Recursive Scanning**: Scans all subdirectories
+- **Archive Scanning**: Examines compressed files
+- **PUA Detection**: Potentially Unwanted Applications detection
+- **File Size Limits**: 512MB maximum per file/archive
+- **Excluded Directories**: `/proc`, `/sys`, `/dev`, `/snap`, `/run`, `/tmp`
 
-Output Files
+### Output Files
+- **Log File**: `/var/log/clamav-full-scan-YYYYMMDD-HHMMSS.log`
+- **Scan Report**: `/var/log/clamav-scan-report-YYYYMMDD-HHMMSS.txt`
 
-Log File: /var/log/clamav-full-scan-YYYYMMDD-HHMMSS.log
+## Prerequisites
 
-Scan Report: /var/log/clamav-scan-report-YYYYMMDD-HHMMSS.txt
+### Required Software
+- **ClamAV**: Must be installed on your system
+- **freshclam**: ClamAV's virus definition update tool
+- **Bash**: Version 4.0 or higher
 
-Usage
-bash
+### Installation
+```bash
+# Install ClamAV on Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install clamav clamav-daemon
+
+# Install ClamAV on CentOS/RHEL
+sudo yum install clamav clamav-update
 
 # Make script executable
     chmod +x full-system-scan.sh
